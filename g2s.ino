@@ -1,4 +1,5 @@
 #include <AccelStepper.h>
+#include <MultiStepper.h>
 const int stepsPerRevolution = 6400;
 
 /**** Pin configuration ****/
@@ -18,7 +19,7 @@ const int stepsPerRevolution = 6400;
 #define Z_ENABLE_PIN 35
 
 #define ACC 1600
-#define MAX_SPEED 2000
+#define MAX_SPEED 1000
 
 /**** States and constants for homing ****/
 #define HOME_INIT 0
@@ -38,23 +39,22 @@ AccelStepper xmotor(1, X_STEP_PIN, X_DIR_PIN);
 AccelStepper ymotor(1, Y_STEP_PIN, Y_DIR_PIN);
 AccelStepper zmotor(1, Z_STEP_PIN, Z_DIR_PIN);
 
-String inputString = "";         // a String to hold incoming data
-boolean stringComplete = false;  // whether the string is complete
-int stringLenght = 0;
+MultiStepper motor;
 
-#define MAX_COORDS 4
+byte serialData[20]; // To hold serial data
+byte serialDataLength = 0; // lengt of serial data
+boolean serialDataComplete = false;  // whether the string is complete
 
-int ipointer = 0;
-int opointer = 0;
+#define MAX_COORDS 40
 
-long xCords[MAX_COORDS];
-long yCords[MAX_COORDS];
-long zCords[MAX_COORDS];
+byte ipointer = 0;
+byte opointer = 0;
+
+long coord[MAX_COORDS][3];
 
 boolean moving = false;
 
 void setup() {
-  // put your setup code here, to run once:
   pinMode(X_MAX_PIN, INPUT);
   pinMode(Y_MAX_PIN, INPUT);
   pinMode(Z_MAX_PIN, INPUT);
@@ -68,11 +68,13 @@ void setup() {
   zmotor.setMaxSpeed(MAX_SPEED);
   zmotor.setAcceleration(ACC);
 
-  Serial.begin(115200);
-  Serial.println("Booting v.1");
+  motor.addStepper(xmotor);
+  motor.addStepper(ymotor);
+  motor.addStepper(zmotor);
 
-  inputString.reserve(50);
-  
+  Serial.begin(1000000);
+  Serial.println("Booting");
+
   home_r();
 }
 
@@ -109,6 +111,8 @@ void home_r(){
       xmotor.setCurrentPosition(0);
       ymotor.setCurrentPosition(0);
       zmotor.setCurrentPosition(0);
+      long zeros[] = {0,0,0};
+      motor.moveTo(zeros);
       Serial.println("Homing Done");
       break;
     }
@@ -117,86 +121,51 @@ void home_r(){
 
 void loop() {
   // put your main code here, to run repeatedly:
-  if (stringComplete) {
-    //Serial.println(inputString);
+  if (serialDataComplete) {
     // clear the string:
-    if(stringLenght > 1){
-      if(inputString[0] == 'G'){
-        switch(inputString[1]){
+    if(serialDataLength > 1){
+      if(serialData[0] == 'G'){
+        switch(serialData[1]){
           case '9': 
             home_r();
             break;
           case '0':
-            Serial.println("G0 started");
             decodeSting();
-            Serial.println("G0 ended");
             break;
         }
       }
     }
-    inputString = "";
-    stringComplete = false;
-    stringLenght = 0;
+    serialDataComplete = false;
+    serialDataLength = 0;
   }
-  if(!moving){
+  if(!motor.run()){
     if(opointer != ipointer){
-      
-      Serial.println("Poitner not equal");
-      
-      Serial.println(xCords[opointer]);
-      Serial.println(yCords[opointer]);
-      Serial.println(zCords[opointer]);
-      
-      xmotor.moveTo(xCords[opointer]);
-      ymotor.moveTo(yCords[opointer]);
-      zmotor.moveTo(zCords[opointer]);
+      motor.moveTo(coord[opointer]);
       opointer = (opointer + 1) % MAX_COORDS;
-      moving = true;
-    }
-  }else{
-    xmotor.run();
-    ymotor.run();
-    zmotor.run();
-    //Serial.println(xmotor.distanceToGo());
-    if(xmotor.distanceToGo() == 0 && ymotor.distanceToGo() == 0 && zmotor.distanceToGo() == 0){
-      moving = false;
+      Serial.print("O\n");
     }
   }
 }
 
 void decodeSting(){
-  int pointer = 2;
-  int chordpos = 0;
-  String pos = "";
-  pos.reserve(8);
-  while(true){
-    if(inputString[++pointer] != ';'){
-      pos += inputString[pointer];
-    }else{
-      Serial.println(pos);
-      switch(chordpos++){
-        case 0: xCords[ipointer] = pos.toInt(); pos = ""; break;
-        case 1: yCords[ipointer] = pos.toInt(); pos = ""; break;
-        case 2: zCords[ipointer] = pos.toInt(); pos = ""; break;
-      }
-      if(chordpos == 3) break;
-    }
+  if(serialDataLength == 9){
+    coord[ipointer][0] = serialData[2] << 8 | serialData[3];
+    coord[ipointer][1] = serialData[4] << 8 | serialData[5];
+    coord[ipointer][2] = serialData[6] << 8 | serialData[7];
   }
-  Serial.println("Egern er seje");
   ipointer = (ipointer + 1) % MAX_COORDS;
 }
 
 void serialEvent() {
   while (Serial.available()) {
     // get the new byte:
-    char inChar = (char)Serial.read();
+    byte inChar = Serial.read();
     // add it to the inputString:
-    inputString += inChar;
-    stringLenght++;
+    serialData[serialDataLength++] = inChar;
     // if the incoming character is a newline, set a flag so the main loop can
     // do something about it:
     if (inChar == '\n') {
-      stringComplete = true;
+      serialDataComplete = true;
     }
   }
 }
