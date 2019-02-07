@@ -79,6 +79,7 @@ void setup() {
 }
 
 void home_r(){
+  Serial.println("Homing..");
   xState = HOME_FAST;
   yState = HOME_FAST;
   zState = HOME_FAST;
@@ -122,7 +123,6 @@ void home_r(){
 void loop() {
   // put your main code here, to run repeatedly:
   if (serialDataComplete) {
-    // clear the string:
     if(serialDataLength > 1){
       if(serialData[0] == 'G'){
         switch(serialData[1]){
@@ -135,6 +135,7 @@ void loop() {
         }
       }
     }
+    // clear the string:
     serialDataComplete = false;
     serialDataLength = 0;
   }
@@ -157,7 +158,7 @@ void decodeSting(){
 }
 
 void serialEvent() {
-  while (Serial.available()) {
+  while (Serial.available() && !serialDataComplete) {
     // get the new byte:
     byte inChar = Serial.read();
     // add it to the inputString:
