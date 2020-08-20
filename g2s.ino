@@ -27,6 +27,8 @@ const int stepsPerRevolution = 6400;
 #define HOME_SLOW 2
 #define HOME_DONE 3
 
+#define HOME_SPEED -800
+#define HOME_STOP_SPEED 0
 #define HOME_FAST_SPEED -800
 #define HOME_SLOW_SPEED 100
 #define HOME_MOVE -400
@@ -34,6 +36,11 @@ const int stepsPerRevolution = 6400;
 int xState = HOME_INIT;
 int yState = HOME_INIT;
 int zState = HOME_INIT;
+
+
+boolean xHome = false;
+boolean yHome = false;
+boolean zHome = false;
 
 AccelStepper xmotor(1, X_STEP_PIN, X_DIR_PIN);
 AccelStepper ymotor(1, Y_STEP_PIN, Y_DIR_PIN);
@@ -80,41 +87,34 @@ void setup() {
 
 void home_r(){
   Serial.println("Homing..");
-  xState = HOME_FAST;
-  yState = HOME_FAST;
-  zState = HOME_FAST;
 
-  xmotor.setSpeed(HOME_FAST_SPEED);
-  ymotor.setSpeed(HOME_FAST_SPEED);
-  zmotor.setSpeed(HOME_FAST_SPEED);
+  xmotor.setSpeed(HOME_SPEED);
+  ymotor.setSpeed(HOME_SPEED);
+  zmotor.setSpeed(HOME_SPEED);
 
   while(true){
-    if(digitalRead(X_MAX_PIN) && xState == HOME_FAST){
-      xState = HOME_SLOW;
+    if(digitalRead(X_MAX_PIN)){
+      xmotor.setSpeed(HOME_STOP_SPEED);
+      xmotor.setCurrentPosition(0);
+      xHome = true;
     }
-    if(digitalRead(Y_MAX_PIN) && yState == HOME_FAST){
-      yState = HOME_SLOW;
+    if(digitalRead(Y_MAX_PIN)){
+      ymotor.setSpeed(HOME_STOP_SPEED);
+      ymotor.setCurrentPosition(0);
+      yHome = true;
     }
-    if(digitalRead(Z_MAX_PIN) && zState == HOME_FAST){
-      zState = HOME_SLOW;
+    if(digitalRead(Z_MAX_PIN)){ 
+      zmotor.setSpeed(HOME_STOP_SPEED);
+      zmotor.setCurrentPosition(0);
+      zHome = true;
     }
 
-    if(xState == HOME_FAST){
-      xmotor.runSpeed();
-    }
-    if(yState == HOME_FAST){
-      ymotor.runSpeed();
-    }
-    if(zState == HOME_FAST){
-      zmotor.runSpeed();
-    }
-    if(xState == HOME_SLOW && yState == HOME_SLOW && zState == HOME_SLOW){
-      xmotor.setCurrentPosition(0);
-      ymotor.setCurrentPosition(0);
-      zmotor.setCurrentPosition(0);
-      long zeros[] = {0,0,0};
-      motor.moveTo(zeros);
-      Serial.println("Homing Done");
+    xmotor.runSpeed();
+    ymotor.runSpeed();
+    zmotor.runSpeed();
+   
+    if (xHome == true && yHome == true && zHome == true){
+      Serial.println("Homing Done!");
       break;
     }
   }
